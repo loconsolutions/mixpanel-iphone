@@ -1,20 +1,21 @@
 #import <XCTest/XCTest.h>
 
-#import "Mixpanel.h"
-#import "MPNotification.h"
-#import "MPSurvey.h"
-#import "MPSurveyQuestion.h"
-#import "HTTPServer.h"
-#import "MixpanelDummyHTTPConnection.h"
-#import "MPSurveyNavigationController.h"
-#import "MPNotificationViewController.h"
 #import <objc/runtime.h>
+#import "HTTPServer.h"
+#import "Mixpanel.h"
+#import "MixpanelDummyHTTPConnection.h"
+#import "MPNotification.h"
+#import "MPNotificationViewController.h"
+#import "MPSurvey.h"
+#import "MPSurveyNavigationController.h"
+#import "MPSurveyQuestion.h"
 
 #define TEST_TOKEN @"abc123"
 
 #pragma mark - Interface Redefinitions
 
 @interface Mixpanel (Test)
+
 // get access to private members
 
 @property (nonatomic, retain) NSMutableArray *eventsQueue;
@@ -41,6 +42,7 @@
 @end
 
 @interface MixpanelPeople (Test)
+
 // get access to private members
 
 @property (nonatomic, retain) NSMutableArray *unidentifiedQueue;
@@ -53,7 +55,7 @@
  version of XCTest does not support asynchonous tests and
  will not compile unless we define these symbols.
  */
-#if !__has_include("XCTest/XCTextCase+AsynchronousTesting.h")
+#if !__has_include("XCTest/XCTestCase+AsynchronousTesting.h")
 @interface XCTestExpectation
 
 - (void)fulfill;
@@ -1137,6 +1139,58 @@
         });
         [self waitForExpectationsWithTimeout:self.mixpanel.miniNotificationPresentationTime * 2 handler:nil];
     }
+}
+
+- (void)testNoShowNotificationOnAlertController
+{
+    UIViewController *topVC = [self topViewController];
+
+    UIAlertController *alertController = [UIAlertController alertControllerWithTitle:@"Alert" message:nil preferredStyle:UIAlertControllerStyleAlert];
+    [alertController addAction:[UIAlertAction actionWithTitle:@"Ok" style:UIAlertActionStyleDefault handler:nil]];
+
+    __block BOOL waitForBlock = YES;
+    [topVC presentViewController:alertController animated:NO completion:^{
+        waitForBlock = NO;
+    }];
+
+    while(waitForBlock) {
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+    }
+
+    NSDictionary *o = @{@"id": @3,
+                        @"message_id": @1,
+                        @"title": @"title",
+                        @"type": @"takeover",
+                        @"body": @"body",
+                        @"cta": @"cta",
+                        @"cta_url": @"maps://",
+                        @"image_url": @"http://cdn.mxpnl.com/site_media/images/engage/inapp_messages/mini/icon_coin.png"};
+    MPNotification *notif = [MPNotification notificationWithJSONObject:o];
+    [self.mixpanel showNotificationWithObject:notif];
+
+    //wait for notifs to be shown from main queue
+    [self waitForAsyncQueue];
+
+    topVC = [self topViewController];
+    XCTAssertFalse([topVC isKindOfClass:[MPNotificationViewController class]], @"Notification was presented");
+
+    // Dismiss the alert and try to present notification again
+    waitForBlock = YES;
+    [topVC dismissViewControllerAnimated:YES completion:^{
+        waitForBlock = NO;
+    }];
+
+    while(waitForBlock) {
+        [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+    }
+
+    [self.mixpanel showNotificationWithObject:notif];
+
+    //wait for notifs to be shown from main queue
+    [self waitForAsyncQueue];
+
+    topVC = [self topViewController];
+    XCTAssertTrue([topVC isKindOfClass:[MPNotificationViewController class]], @"Notification wasn't presented");
 }
 
 - (void)testNoShowSurveyOnPresentingVC

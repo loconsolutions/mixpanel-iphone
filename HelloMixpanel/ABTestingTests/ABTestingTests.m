@@ -7,17 +7,16 @@
 //
 
 #import <XCTest/XCTest.h>
-
-#import "Mixpanel.h"
-#import "MPSwizzler.h"
-#import "MPVariant.h"
-#import "MPObjectSelector.h"
 #import "HomeViewController.h"
 #import "HTTPServer.h"
+#import "Mixpanel.h"
 #import "MixpanelDummyDecideConnection.h"
+#import "UIView+MPHelpers.h"
+#import "MPObjectSelector.h"
+#import "MPSwizzler.h"
 #import "MPValueTransformers.h"
+#import "MPVariant.h"
 #import "NSData+MPBase64.h"
-#import "MPCategoryHelpers.h"
 
 #define TEST_TOKEN @"abc123"
 
@@ -54,7 +53,7 @@
 @end
 @implementation A
 
-- (id)init
+- (instancetype)init
 {
     if((self = [super init])) {
         self.count = 0;
@@ -93,7 +92,7 @@
  version of XCTest does not support asynchonous tests and
  will not compile unless we define these symbols
  */
-#if !__has_include("XCTest/XCTextCase+AsynchronousTesting.h")
+#if !__has_include("XCTest/XCTestCase+AsynchronousTesting.h")
 @interface XCTestExpectation
 
 - (void)fulfill;
@@ -276,7 +275,7 @@
             XCTAssertEqualObjects(label2.text, @"Old Text 2", @"Label2 text should never have changed, as it was added after the variant was stopped");
             [expect fulfill];
         });
-        [self waitForExpectationsWithTimeout:0.1 handler:nil];
+        [self waitForExpectationsWithTimeout:0.5 handler:nil];
     }
 }
 
@@ -568,20 +567,22 @@
 - (void)testMpHelpers
 {
     UIView *v1 = [[UIView alloc] init];
-    
+
     XCTAssert([v1 respondsToSelector:@selector(mp_fingerprintVersion)]);
     XCTAssert([v1 mp_fingerprintVersion] == 1);
-    
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundeclared-selector"
     XCTAssert([v1 respondsToSelector:@selector(mp_varA)]);
     XCTAssert([v1 respondsToSelector:@selector(mp_varB)]);
     XCTAssert([v1 respondsToSelector:@selector(mp_varC)]);
     XCTAssert([v1 respondsToSelector:@selector(mp_varSetD)]);
     XCTAssert([v1 respondsToSelector:@selector(mp_varE)]);
-    
+
     XCTAssert([v1 respondsToSelector:@selector(mp_snapshotForBlur)]);
     XCTAssert([v1 respondsToSelector:@selector(mp_snapshotImage)]);
-    
+
     XCTAssertFalse([v1 respondsToSelector:@selector(mp_nonexistant)]);
+#pragma clang diagnostic pop
 }
 
 - (void)testUITableViewCellOrdering
